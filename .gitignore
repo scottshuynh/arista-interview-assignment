@@ -1,0 +1,5 @@
+*.txt
+nvc/
+vivado/
+*.pickle
+venv*/
