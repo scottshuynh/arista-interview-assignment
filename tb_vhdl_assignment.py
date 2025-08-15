@@ -27,6 +27,21 @@ async def drive_cmds(dut, cmds: List[List[int]]):
     dut.data_in_vld.value = 0
 
 
+async def drive_cmds_random_vlds(dut, cmds: List[List[int]]):
+    for cmd in cmds:
+        byte_idx = 0
+        while byte_idx < len(cmd):
+            if random.randint(0, 1):
+                dut.data_in.value = cmd[byte_idx]
+                dut.data_in_vld.value = 1
+                byte_idx += 1
+            else:
+                dut.data_in_vld.value = 0
+            await RisingEdge(dut.clk)
+
+    dut.data_in_vld.value = 0
+
+
 async def verify_sequences(dut, sequences: List[List[int]]):
     timeout = 0
     for seq_idx, sequence in enumerate(sequences):
@@ -147,6 +162,113 @@ async def test_simple_cases(dut):
     ]
 
     drive_task = cocotb.start_soon(drive_cmds(dut, cmds))
+    verify_task = cocotb.start_soon(verify_sequences(dut, sequences))
+
+    while not verify_task.done():
+        await RisingEdge(dut.clk)
+
+
+@cocotb.test()
+async def test_simple_random_vlds(dut):
+    """Drives commands in at random times and verifies against expected sequence."""
+    cocotb.start_soon(Clock(dut.clk, 1, "ns").start())
+    await reset_dut(dut, random.randint(1, 10))
+    await RisingEdge(dut.clk)
+
+    cmds = [
+        [
+            int("0xe7", 16),
+            int("0x13", 16),
+            int("0x00", 16),
+            int("0x00", 16),
+            int("0x00", 16),
+            int("0x03", 16),
+        ],
+        [
+            int("0xe7", 16),
+            int("0x13", 16),
+            int("0x00", 16),
+            int("0x00", 16),
+            int("0x00", 16),
+            int("0xe7", 16),
+            int("0xe7", 16),
+        ],
+        [
+            int("0xe7", 16),
+            int("0x23", 16),
+            int("0x00", 16),
+            int("0x00", 16),
+            int("0x00", 16),
+            int("0x02", 16),
+            int("0xaa", 16),
+            int("0xe7", 16),
+            int("0xe7", 16),
+            int("0x55", 16),
+            int("0xaa", 16),
+            int("0xe7", 16),
+            int("0x13", 16),
+            int("0x00", 16),
+            int("0x00", 16),
+            int("0x00", 16),
+            int("0x02", 16),
+        ],
+        [
+            int("0xe7", 16),
+            int("0x23", 16),
+            int("0x00", 16),
+            int("0x00", 16),
+            int("0x00", 16),
+            int("0x01", 16),
+            int("0xaa", 16),
+            int("0xe7", 16),
+            int("0x55", 16),
+            int("0xe7", 16),
+            int("0x13", 16),
+            int("0x00", 16),
+            int("0x00", 16),
+            int("0x00", 16),
+            int("0x01", 16),
+        ],
+    ]
+
+    sequences = [
+        [
+            int("0xe7", 16),
+            int("0x03", 16),
+            int("0x10", 16),
+            int("0x20", 16),
+            int("0x30", 16),
+            int("0x40", 16),
+        ],
+        [
+            int("0xe7", 16),
+            int("0x03", 16),
+            int("0xde", 16),
+            int("0xad", 16),
+            int("0xbe", 16),
+            int("0xef", 16),
+        ],
+        [
+            int("0xe7", 16),
+            int("0x03", 16),
+            int("0xaa", 16),
+            int("0xe7", 16),
+            int("0xe7", 16),
+            int("0x55", 16),
+            int("0xaa", 16),
+        ],
+        [
+            int("0xe7", 16),
+            int("0x03", 16),
+            int("0x89", 16),
+            int("0xab", 16),
+            int("0xcd", 16),
+            int("0xe7", 16),
+            int("0xe7", 16),
+        ],
+    ]
+
+    drive_task = cocotb.start_soon(drive_cmds_random_vlds(dut, cmds))
     verify_task = cocotb.start_soon(verify_sequences(dut, sequences))
 
     while not verify_task.done():
