@@ -3,3 +3,4 @@ nvc/
 vivado/
 *.pickle
 venv*/
+__pycache__/
