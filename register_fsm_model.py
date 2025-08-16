@@ -18,58 +18,80 @@ class CommandBytes(Enum):
 
 
 class RegisterFsmModel:
-    def __init__(self, num_cmds: int):
-        self.set_num_commands(num_cmds)
-        self.generate_commands()
-        self.generate_expected_read_datas()
-        self.data_w = 32
-        self.addr_w = 16
+    def __init__(self, num_cmds: int, data_w: int, addr_w: int):
+        assert num_cmds > 0, f"Number of commands must be greater than 0. Got {num_cmds}."
+        self.data_w = data_w
+        self.addr_w = addr_w
         self.byte_w = 8
         self.mem_model = MemoryModel(self.data_w, self.addr_w)
         commands = [CommandBytes.READ, CommandBytes.WRITE, CommandBytes.BREAK, CommandBytes.ESCAPE]
         self._command_values = [command.value for command in commands]
-
-    def set_num_commands(self, num_cmds: int):
-        assert num_cmds > 0, f"Number of commands must be greater than 0. Got {num_cmds}."
-        self._num_cmds = num_cmds
-
-    def __gemerate_random_address_lsbs(self) -> Tuple[List[int], bool]:
-        choice_addrs_lsb: List[int] = list(self.mem_model.valid_addrs).append(42)
-        choice_addrs_lsb.extend(self._command_values)
-        addr_lsbs: List[int] = []
-        addr_complete = False
-        interrupt_cmd = False
-        while not addr_complete:
-            addr_lsb = random.choice(choice_addrs_lsb)
-            if addr_lsb == 0:
-                addr_lsbs.append(addr_lsb)
-            elif addr_lsb in self.mem_model.valid_addrs or addr_lsb == 42:
-                addr_lsbs.append(addr_lsb)
-                addr_complete = True
-            else:
-                addr_lsbs.extend(self.__generate_command_bytes(addr_lsb))
-                addr_complete = True
-                interrupt_cmd = True
-
-        return tuple([addr_lsbs, interrupt_cmd])
+        self.generate_commands(num_cmds)
+        self.generate_expected_read_datas()
 
     def __generate_random_address_bytes(self) -> Tuple[List[int], bool]:
-        choice_addrs_msb = [0, CommandBytes.ESCAPE.value]
-        addr_msbs = [random.choice(choice_addrs_msb)]
-        addr_lsbs: List[int] = []
+        num_bytes = math.ceil(self.addr_w / self.byte_w)
+        addr_bytes: List[int] = []
+        is_escaped = False
         interrupt_cmd = False
-        if addr_msbs[0] == 0:
-            addr_lsbs, interrupt_cmd = self.__gemerate_random_address_lsbs()
-        elif addr_msbs[0] == CommandBytes.ESCAPE.value:
-            addr_msb = random.choice(self._command_values)
-            addr_msbs.extend(self.__generate_command_bytes(addr_msb))
-            interrupt_cmd = False
-        return tuple([addr_msbs + addr_lsbs, interrupt_cmd])
+        byte_idx = 0
+        while byte_idx < num_bytes:
+            if byte_idx == 0:
+                choice_addrs_msb = [0, CommandBytes.ESCAPE.value]
+                addr_byte = random.choice(choice_addrs_msb)
+                addr_bytes.append(addr_byte)
+                byte_idx += 1
+                if addr_byte == CommandBytes.ESCAPE.value:
+                    is_escaped = True
+            else:
+                if not is_escaped:
+                    choice_addrs_lsb: List[int] = list(self.mem_model.valid_addrs).append(42)
+                    choice_addrs_lsb.extend(self._command_values)
+                    addr_byte = random.choice(choice_addrs_lsb)
+                    addr_bytes.append(addr_byte)
+                    if addr_byte == CommandBytes.ESCAPE.value:
+                        is_escaped = True
+                    elif addr_byte > 0:
+                        byte_idx += 1
+                elif is_escaped:
+                    addr_byte = random.choice(self._command_values)
+                    is_escaped = False
+                    addr_bytes.append(addr_byte)
+                    if addr_byte == CommandBytes.ESCAPE.value:
+                        byte_idx += 1
+                    else:
+                        addr_bytes.extend(self.__generate_command_bytes(addr_byte))
+                        byte_idx = num_bytes
+                        interrupt_cmd = True
+
+        return tuple([addr_bytes, interrupt_cmd])
 
     def __generate_random_data_bytes(self) -> List[int]:
-        pass
+        num_bytes = math.ceil(self.data_w / self.byte_w)
+        data_bytes: List[int] = []
+        is_escaped = False
+        byte_idx = 0
+        while byte_idx < num_bytes:
+            if not is_escaped:
+                data_byte = random.randint(-(2 ** (self.byte_w - 1)), 2 ** (self.byte_w - 1) - 1)
+                data_bytes.append(data_byte)
+                if data_byte == CommandBytes.ESCAPE.value:
+                    is_escaped = True
+                elif data_byte != CommandBytes.NULL.value:
+                    byte_idx += 1
+            elif is_escaped:
+                data_byte = random.choice(self._command_values)
+                is_escaped = False
+                data_bytes.append(data_byte)
+                if data_byte == CommandBytes.ESCAPE.value:
+                    byte_idx += 1
+                else:
+                    data_bytes.extend(self.__generate_command_bytes(data_byte))
+                    byte_idx = num_bytes
 
-    def __generate_command_bytes(self, command_value: int):
+        return data_bytes
+
+    def __generate_command_bytes(self, command_value: int) -> List[int]:
         command_bytes: List[int] = []
         if command_value == CommandBytes.READ.value:
             command_byte, _ = self.__generate_random_address_bytes()
@@ -78,7 +100,7 @@ class RegisterFsmModel:
             command_byte, interrupt_cmd = self.__generate_random_address_bytes()
             command_bytes.extend(command_byte)
             if not interrupt_cmd:
-                command_bytes.extend(self.__generate_random_data_bytes)
+                command_bytes.extend(self.__generate_random_data_bytes())
         elif command_value == CommandBytes.BREAK.value:
             command_bytes.append(command_value)
         elif command_value == CommandBytes.ESCAPE.value:
