@@ -3,7 +3,7 @@ from cocotb.clock import Clock
 from cocotb.types import LogicArray, Range
 from cocotb.triggers import RisingEdge, FallingEdge
 import random
-from typing import List
+from typing import List, Sequence
 
 
 async def reset_dut(dut, num_clock_cycles: int):
@@ -17,7 +17,7 @@ async def reset_dut(dut, num_clock_cycles: int):
     dut.reset.value = 0
 
 
-async def drive_cmds(dut, cmds: List[List[int]]):
+async def drive_cmds(dut, cmds: List[Sequence[int]]):
     for cmd in cmds:
         for byte in cmd:
             dut.data_in.value = byte
@@ -27,7 +27,7 @@ async def drive_cmds(dut, cmds: List[List[int]]):
     dut.data_in_vld.value = 0
 
 
-async def drive_cmds_random_vlds(dut, cmds: List[List[int]]):
+async def drive_cmds_random_vlds(dut, cmds: List[Sequence[int]]):
     for cmd in cmds:
         byte_idx = 0
         while byte_idx < len(cmd):
@@ -42,7 +42,7 @@ async def drive_cmds_random_vlds(dut, cmds: List[List[int]]):
     dut.data_in_vld.value = 0
 
 
-async def verify_sequences(dut, sequences: List[List[int]]):
+async def verify_sequences(dut, sequences: List[Sequence[int]]):
     timeout = 0
     for seq_idx, sequence in enumerate(sequences):
         byte_count = 0
@@ -68,97 +68,20 @@ async def test_simple_cases(dut):
     await reset_dut(dut, random.randint(1, 10))
     await RisingEdge(dut.clk)
 
-    cmds = [
-        [
-            int("0xe7", 16),
-            int("0x13", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x03", 16),
-        ],
-        [
-            int("0xe7", 16),
-            int("0x13", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0xe7", 16),
-            int("0xe7", 16),
-        ],
-        [
-            int("0xe7", 16),
-            int("0x23", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x02", 16),
-            int("0xaa", 16),
-            int("0xe7", 16),
-            int("0xe7", 16),
-            int("0x55", 16),
-            int("0xaa", 16),
-            int("0xe7", 16),
-            int("0x13", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x02", 16),
-        ],
-        [
-            int("0xe7", 16),
-            int("0x23", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x01", 16),
-            int("0xaa", 16),
-            int("0xe7", 16),
-            int("0x55", 16),
-            int("0xe7", 16),
-            int("0x13", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x01", 16),
-        ],
+    cmds: List[bytearray] = [
+        bytearray([0xE7, 0x13, 0x00, 0x00, 0x00, 0x03]),
+        bytearray([0xE7, 0x13, 0x00, 0x00, 0x00, 0xE7, 0xE7]),
+        bytearray(
+            [0xE7, 0x23, 0x00, 0x00, 0x00, 0x02, 0xAA, 0xE7, 0xE7, 0x55, 0xAA, 0xE7, 0x13, 0x00, 0x00, 0x00, 0x02]
+        ),
+        bytearray([0xE7, 0x23, 0x00, 0x00, 0x00, 0x01, 0xAA, 0xE7, 0x55, 0xE7, 0x13, 0x00, 0x00, 0x00, 0x01]),
     ]
 
-    sequences = [
-        [
-            int("0xe7", 16),
-            int("0x03", 16),
-            int("0x10", 16),
-            int("0x20", 16),
-            int("0x30", 16),
-            int("0x40", 16),
-        ],
-        [
-            int("0xe7", 16),
-            int("0x03", 16),
-            int("0xde", 16),
-            int("0xad", 16),
-            int("0xbe", 16),
-            int("0xef", 16),
-        ],
-        [
-            int("0xe7", 16),
-            int("0x03", 16),
-            int("0xaa", 16),
-            int("0xe7", 16),
-            int("0xe7", 16),
-            int("0x55", 16),
-            int("0xaa", 16),
-        ],
-        [
-            int("0xe7", 16),
-            int("0x03", 16),
-            int("0x89", 16),
-            int("0xab", 16),
-            int("0xcd", 16),
-            int("0xe7", 16),
-            int("0xe7", 16),
-        ],
+    sequences: List[bytearray] = [
+        bytearray([0xE7, 0x03, 0x10, 0x20, 0x30, 0x40]),
+        bytearray([0xE7, 0x03, 0xDE, 0xAD, 0xBE, 0xEF]),
+        bytearray([0xE7, 0x03, 0xAA, 0xE7, 0xE7, 0x55, 0xAA]),
+        bytearray([0xE7, 0x03, 0x89, 0xAB, 0xCD, 0xE7, 0xE7]),
     ]
 
     drive_task = cocotb.start_soon(drive_cmds(dut, cmds))
@@ -175,97 +98,20 @@ async def test_simple_random_vlds(dut):
     await reset_dut(dut, random.randint(1, 10))
     await RisingEdge(dut.clk)
 
-    cmds = [
-        [
-            int("0xe7", 16),
-            int("0x13", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x03", 16),
-        ],
-        [
-            int("0xe7", 16),
-            int("0x13", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0xe7", 16),
-            int("0xe7", 16),
-        ],
-        [
-            int("0xe7", 16),
-            int("0x23", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x02", 16),
-            int("0xaa", 16),
-            int("0xe7", 16),
-            int("0xe7", 16),
-            int("0x55", 16),
-            int("0xaa", 16),
-            int("0xe7", 16),
-            int("0x13", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x02", 16),
-        ],
-        [
-            int("0xe7", 16),
-            int("0x23", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x01", 16),
-            int("0xaa", 16),
-            int("0xe7", 16),
-            int("0x55", 16),
-            int("0xe7", 16),
-            int("0x13", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x00", 16),
-            int("0x01", 16),
-        ],
+    cmds: List[bytearray] = [
+        bytearray([0xE7, 0x13, 0x00, 0x00, 0x00, 0x03]),
+        bytearray([0xE7, 0x13, 0x00, 0x00, 0x00, 0xE7, 0xE7]),
+        bytearray(
+            [0xE7, 0x23, 0x00, 0x00, 0x00, 0x02, 0xAA, 0xE7, 0xE7, 0x55, 0xAA, 0xE7, 0x13, 0x00, 0x00, 0x00, 0x02]
+        ),
+        bytearray([0xE7, 0x23, 0x00, 0x00, 0x00, 0x01, 0xAA, 0xE7, 0x55, 0xE7, 0x13, 0x00, 0x00, 0x00, 0x01]),
     ]
 
-    sequences = [
-        [
-            int("0xe7", 16),
-            int("0x03", 16),
-            int("0x10", 16),
-            int("0x20", 16),
-            int("0x30", 16),
-            int("0x40", 16),
-        ],
-        [
-            int("0xe7", 16),
-            int("0x03", 16),
-            int("0xde", 16),
-            int("0xad", 16),
-            int("0xbe", 16),
-            int("0xef", 16),
-        ],
-        [
-            int("0xe7", 16),
-            int("0x03", 16),
-            int("0xaa", 16),
-            int("0xe7", 16),
-            int("0xe7", 16),
-            int("0x55", 16),
-            int("0xaa", 16),
-        ],
-        [
-            int("0xe7", 16),
-            int("0x03", 16),
-            int("0x89", 16),
-            int("0xab", 16),
-            int("0xcd", 16),
-            int("0xe7", 16),
-            int("0xe7", 16),
-        ],
+    sequences: List[bytearray] = [
+        bytearray([0xE7, 0x03, 0x10, 0x20, 0x30, 0x40]),
+        bytearray([0xE7, 0x03, 0xDE, 0xAD, 0xBE, 0xEF]),
+        bytearray([0xE7, 0x03, 0xAA, 0xE7, 0xE7, 0x55, 0xAA]),
+        bytearray([0xE7, 0x03, 0x89, 0xAB, 0xCD, 0xE7, 0xE7]),
     ]
 
     drive_task = cocotb.start_soon(drive_cmds_random_vlds(dut, cmds))
