@@ -5,6 +5,8 @@ from cocotb.triggers import RisingEdge, FallingEdge
 import random
 from typing import List, Sequence
 
+from register_fsm_model import RegisterFsmModel
+
 
 async def reset_dut(dut, num_clock_cycles: int):
     dut.reset.value = 1
@@ -22,6 +24,12 @@ async def drive_cmds(dut, cmds: List[Sequence[int]]):
         for byte in cmd:
             dut.data_in.value = byte
             dut.data_in_vld.value = 1
+            await RisingEdge(dut.clk)
+
+        dut.data_in_vld.value = 0
+        await FallingEdge(dut.clk)
+        assert dut.u_fsm.reg_fsm.value == 0
+        for _ in range(8):
             await RisingEdge(dut.clk)
 
     dut.data_in_vld.value = 0
@@ -46,6 +54,7 @@ async def verify_sequences(dut, sequences: List[Sequence[int]]):
     timeout = 0
     for seq_idx, sequence in enumerate(sequences):
         byte_count = 0
+        # cocotb.log.info(f"Validating sequence#{seq_idx}: {sequence}")
         while byte_count < len(sequence):
             timeout += 1
             await FallingEdge(dut.clk)
@@ -118,4 +127,25 @@ async def test_simple_random_vlds(dut):
     verify_task = cocotb.start_soon(verify_sequences(dut, sequences))
 
     while not verify_task.done():
+        await RisingEdge(dut.clk)
+
+
+@cocotb.test()
+async def test_scoreboard_vs_model(dut):
+    cocotb.start_soon(Clock(dut.clk, 1, "ns").start())
+    await reset_dut(dut, random.randint(1, 10))
+    await RisingEdge(dut.clk)
+
+    data_w = dut.u_fsm.DATA_W.value
+    addr_w = dut.u_fsm.ADDR_W.value
+    num_commands = 2 ** (addr_w + 1)
+
+    cocotb.log.info("Initialising model...")
+    model = RegisterFsmModel(num_commands, data_w, addr_w)
+
+    drive_task = cocotb.start_soon(drive_cmds(dut, model.command_bytestreams))
+    verify_task = cocotb.start_soon(verify_sequences(dut, model.read_bytestreams))
+
+    cocotb.log.info("Start verification...")
+    while not verify_task.done() or not drive_task.done():
         await RisingEdge(dut.clk)

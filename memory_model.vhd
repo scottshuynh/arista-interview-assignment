@@ -51,13 +51,13 @@ architecture beh of memory_model is
 
   ------------------------------------------------------------------------------
 
-  constant ADDR_W     : natural := addr'length;
-  constant DATA_W     : natural := wr_data'length;
-  constant LAST_ADDR  : natural := 231;
-  constant OPT_ADDR_W : natural := ceil_log2(LAST_ADDR);
-  constant RAM_LEN    : natural := 2**OPT_ADDR_W;
+  constant ADDR_W      : natural := addr'length;
+  constant DATA_W      : natural := wr_data'length;
+  constant LAST_ADDR   : natural := 231;
+  constant OPT_ADDR_W  : natural := ceil_log2(LAST_ADDR);
+  constant OPT_RAM_LEN : natural := 2**OPT_ADDR_W;
 
-  constant INIT_RAM : array_slv_t(0 to RAM_LEN-1)(DATA_W-1 downto 0) := (
+  constant INIT_RAM : array_slv_t(0 to OPT_RAM_LEN-1)(DATA_W-1 downto 0) := (
       0      => x"01234567",
       1      => x"89abcde7",
       2      => x"0a0b0c0d",
@@ -65,7 +65,7 @@ architecture beh of memory_model is
       231    => x"deadbeef",
       others => (others => '0'));
 
-  constant VALID_RAM_ADDRS : std_logic_vector(RAM_LEN-1 downto 0) := (
+  constant VALID_RAM_ADDRS : std_logic_vector(OPT_RAM_LEN-1 downto 0) := (
       0      => '1',
       1      => '1',
       2      => '1',
@@ -73,7 +73,7 @@ architecture beh of memory_model is
       231    => '1',
       others => '0');
 
-  signal ram      : array_slv_t(0 to RAM_LEN-1)(DATA_W-1 downto 0) := INIT_RAM;
+  signal ram      : array_slv_t(0 to OPT_RAM_LEN-1)(DATA_W-1 downto 0) := INIT_RAM;
   signal ram_addr : unsigned(OPT_ADDR_W-1 downto 0);
 
   constant NUM_RD_PIPELINE : natural                                                := 2;
@@ -96,7 +96,9 @@ begin
       -- RAM write control
       if (wr_en = '1') then
         if (is_valid_ram_addr(ram_addr)) then
-          ram(to_integer(unsigned(ram_addr))) <= wr_data;
+          if (or addr(addr'high downto OPT_ADDR_W) = '0') then
+            ram(to_integer(unsigned(ram_addr))) <= wr_data;
+          end if;
         end if;
       end if;
 
@@ -104,8 +106,10 @@ begin
       rd_ack_regs(0) <= '0';
       if (rd_en = '1') then
         if (is_valid_ram_addr(ram_addr)) then
-          rd_data_regs(0) <= ram(to_integer(unsigned(ram_addr)));
-          rd_ack_regs(0)  <= '1';
+          if (or addr(addr'high downto OPT_ADDR_W) = '0') then
+            rd_data_regs(0) <= ram(to_integer(unsigned(ram_addr)));
+            rd_ack_regs(0)  <= '1';
+          end if;
         end if;
       end if;
 

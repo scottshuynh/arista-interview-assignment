@@ -173,7 +173,7 @@ architecture rtl of register_fsm is
 
   signal rd_resp_fsm : rd_resp_fsm_t := AWAIT_RD_EN;
 
-  signal rd_latency_counter     : unsigned(ceil_log2(RD_LATENCY) downto 0) := (others => '0');
+  signal rd_latency_counter     : unsigned(ceil_log2(RD_LATENCY)-1 downto 0) := (others => '0');
   signal rd_data_bytes          : array_slv_t(0 to NUM_DATA_BYTES-1)(BYTE_W-1 downto 0);
   signal rd_data_bytes_idx      : unsigned(DATA_IDX_W-1 downto 0) := (others => '0');
   signal rd_data_bytes_idx_next : unsigned(DATA_IDX_W downto 0);
@@ -226,8 +226,12 @@ begin
               when CMD_BREAK =>
                 reg_fsm <= AWAIT_ESC;
               when ESCAPE =>
-                assert (False) report "Received 2x escape characters at beginning of command byte stream. Ignoring..." severity WARNING;
+                -- assert (False) 
+                --   report "Received 2x escape characters at beginning of command byte stream. Ignoring..." 
+                --   severity WARNING;
                 reg_fsm <= AWAIT_ESC;
+              when CMD_NULL =>
+                null;
               when others =>
                 assert (FALSE)
                   report "Assumption violated! Escape characters in byte stream must "
@@ -268,14 +272,14 @@ begin
                 end if;
               elsif (byte_data_escaped = '1') then
                 if (to_cmd(data_in) /= CMD_NULL) then
+                  byte_data_escaped <= '0';
                   if (to_cmd(data_in) = CMD_BREAK) then
-                    byte_data_escaped <= '0';
-                    addr_bytes_idx    <= (others => '0');
-                    reg_fsm           <= AWAIT_ESC;
+                    addr_bytes_rcvd <= '0';
+                    addr_bytes_idx  <= (others => '0');
+                    reg_fsm         <= AWAIT_ESC;
                   elsif (to_cmd(data_in) = ESCAPE) then
                     addr_bytes(to_integer(addr_bytes_idx)) <= data_in;
                     addr_bytes_idx                         <= addr_bytes_idx + 1;
-                    byte_data_escaped                      <= '0';
 
                     if (addr_bytes_idx_next >= NUM_ADDR_BYTES) then
                       addr_bytes_rcvd <= '0';
@@ -289,10 +293,10 @@ begin
                       end if;
                     end if;
                   elsif (to_cmd(data_in) /= ESCAPE) then
-                    assert (FALSE)
-                      report "Command change in the middle of parsing addresses!"
-                      severity WARNING;
-
+                    -- assert (FALSE)
+                    --   report "Command change in the middle of parsing addresses!"
+                    --   severity WARNING;
+                    addr_bytes_rcvd <= '0';
                     case (to_cmd(data_in)) is
                       when CMD_READ             =>
                         addr_bytes_idx <= (others => '0');
@@ -322,7 +326,14 @@ begin
         when PARSE_WRITE_DATA =>
           if (data_in_vld = '1') then
             wr_data_bytes_rcvd <= '1';
-            if (or data_in = '1' or wr_data_bytes_rcvd = '0') then
+            if (wr_data_bytes_rcvd = '0') then
+              if (to_cmd(data_in) = ESCAPE) then
+                byte_data_escaped <= '1';
+              else
+                wr_data_bytes(to_integer(wr_data_bytes_idx)) <= data_in;
+                wr_data_bytes_idx                            <= wr_data_bytes_idx + 1;
+              end if;
+            else
               if (byte_data_escaped = '0') then
                 if (to_cmd(data_in) = ESCAPE) then
                   byte_data_escaped <= '1';
@@ -331,34 +342,36 @@ begin
                   wr_data_bytes_idx                            <= wr_data_bytes_idx + 1;
 
                   if (wr_data_bytes_idx_next >= DATA_W/BYTE_W) then
-                    wr_en_reg         <= '1';
-                    wr_task           <= '0';
-                    wr_data_bytes_idx <= (others => '0');
-                    reg_fsm           <= AWAIT_ESC;
+                    wr_data_bytes_rcvd <= '0';
+                    wr_en_reg          <= '1';
+                    wr_task            <= '0';
+                    wr_data_bytes_idx  <= (others => '0');
+                    reg_fsm            <= AWAIT_ESC;
                   end if;
                 end if;
               elsif (byte_data_escaped = '1') then
                 if (to_cmd(data_in) /= CMD_NULL) then
+                  byte_data_escaped <= '0';
                   if (to_cmd(data_in) = CMD_BREAK) then
-                    byte_data_escaped <= '0';
-                    wr_data_bytes_idx <= (others => '0');
-                    reg_fsm           <= AWAIT_ESC;
+                    wr_data_bytes_rcvd <= '0';
+                    wr_data_bytes_idx  <= (others => '0');
+                    reg_fsm            <= AWAIT_ESC;
                   elsif (to_cmd(data_in) = ESCAPE) then
                     wr_data_bytes(to_integer(wr_data_bytes_idx)) <= data_in;
                     wr_data_bytes_idx                            <= wr_data_bytes_idx + 1;
-                    byte_data_escaped                            <= '0';
-
                     if (wr_data_bytes_idx_next >= DATA_W/BYTE_W) then
-                      wr_en_reg         <= '1';
-                      wr_task           <= '0';
-                      wr_data_bytes_idx <= (others => '0');
-                      reg_fsm           <= AWAIT_ESC;
+                      wr_data_bytes_rcvd <= '0';
+                      wr_en_reg          <= '1';
+                      wr_task            <= '0';
+                      wr_data_bytes_idx  <= (others => '0');
+                      reg_fsm            <= AWAIT_ESC;
                     end if;
                   elsif (to_cmd(data_in) /= ESCAPE) then
-                    assert (FALSE)
-                      report "Command change in the middle of a WRITE"
-                      severity WARNING;
-
+                    --assert (FALSE)
+                    --  report "Command change in the middle of a WRITE"
+                    --  severity WARNING;
+                    wr_data_bytes_rcvd <= '0';
+                    wr_data_bytes_idx  <= (others => '0');
                     case (to_cmd(data_in)) is
                       when CMD_READ             =>
                         addr_bytes_idx <= (others => '0');
@@ -441,7 +454,7 @@ begin
           end if;
 
         when PIPE_RD_DATA_BYTES_IDX =>
-          rd_resp_fsm      <= OUTPUT_RD_RESP;
+          rd_resp_fsm <= OUTPUT_RD_RESP;
 
         when OUTPUT_BREAK =>
           data_out_reg     <= to_slv(CMD_BREAK);

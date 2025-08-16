@@ -8,20 +8,21 @@ class MemoryModel:
         assert addr_w > 0, f"Address width must be greater than 0. Got: {addr_w}"
         self.data_w: int = data_w
         self.addr_w: int = addr_w
-        self.ram: List[LogicArray] = self.__generate_initial_ram(data_w)
+        self.ram: List[LogicArray] = self.__generate_initial_ram()
         self.valid_addrs: Set[int] = {0, 1, 2, 3, 231}
 
     def write(self, addr: int, wr_data: int) -> None:
         assert addr >= 0 and addr < len(self.ram), f"Address out of range (0 to {len(self.ram)}). Got: {addr}"
-        assert wr_data >= -(2 ** (self.data_w - 1)) and wr_data < 2 ** (
-            self.data_w - 1
-        ), f"Write data out of range ({-2**(self.data_w-1)} to {2**(self.data_w-1)-1}). Got: {wr_data}"
+        assert (
+            wr_data >= 0 and wr_data < 2**self.data_w - 1
+        ), f"Write data out of range ({0} to {2**self.data_w-1}). Got: {wr_data}"
         if addr in self.valid_addrs:
             self.ram[addr] = LogicArray(wr_data, Range(self.data_w - 1, "downto", 0))
 
-    def read(self, addr: int) -> int:
+    def read(self, addr: int) -> LogicArray:
         assert addr >= 0 and addr < len(self.ram), f"Address out of range (0 to {len(self.ram)}). Got: {addr}"
         if addr in self.valid_addrs:
+            # print(f"RAM({addr}: {self.ram[addr]})")
             return self.ram[addr]
         else:
             return None
