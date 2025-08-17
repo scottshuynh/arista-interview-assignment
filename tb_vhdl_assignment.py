@@ -8,7 +8,7 @@ from typing import List, Sequence
 from register_fsm_model import RegisterFsmModel
 
 
-async def reset_dut(dut, num_clock_cycles: int):
+async def reset_dut(dut, num_clock_cycles: int) -> None:
     dut.reset.value = 1
     dut.data_in.value = 0
     dut.data_in_vld.value = 0
@@ -19,7 +19,7 @@ async def reset_dut(dut, num_clock_cycles: int):
     dut.reset.value = 0
 
 
-async def drive_cmds(dut, cmds: List[Sequence[int]]):
+async def drive_cmds(dut, cmds: List[Sequence[int]]) -> None:
     for cmd in cmds:
         for byte in cmd:
             dut.data_in.value = byte
@@ -35,7 +35,7 @@ async def drive_cmds(dut, cmds: List[Sequence[int]]):
     dut.data_in_vld.value = 0
 
 
-async def drive_cmds_random_vlds(dut, cmds: List[Sequence[int]]):
+async def drive_cmds_random_vlds(dut, cmds: List[Sequence[int]]) -> None:
     for cmd in cmds:
         byte_idx = 0
         while byte_idx < len(cmd):
@@ -50,7 +50,7 @@ async def drive_cmds_random_vlds(dut, cmds: List[Sequence[int]]):
     dut.data_in_vld.value = 0
 
 
-async def verify_sequences(dut, sequences: List[Sequence[int]]):
+async def verify_sequences(dut, sequences: List[Sequence[int]]) -> None:
     timeout = 0
     for seq_idx, sequence in enumerate(sequences):
         byte_count = 0
@@ -132,13 +132,16 @@ async def test_simple_random_vlds(dut):
 
 @cocotb.test()
 async def test_scoreboard_vs_model(dut):
+    """Using a model, generate 65,536 commands and the expected DUT outputs.
+    Drive 65,536 commands into the DUT and check if all outputs are as expected.
+    """
     cocotb.start_soon(Clock(dut.clk, 1, "ns").start())
     await reset_dut(dut, random.randint(1, 10))
     await RisingEdge(dut.clk)
 
     data_w = dut.u_fsm.DATA_W.value
     addr_w = dut.u_fsm.ADDR_W.value
-    num_commands = 2 ** (addr_w + 1)
+    num_commands = 2 ** (addr_w)
 
     cocotb.log.info("Initialising model...")
     model = RegisterFsmModel(num_commands, data_w, addr_w)

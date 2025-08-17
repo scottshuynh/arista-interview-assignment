@@ -5,6 +5,8 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+use std.env.finish;
+
 entity tb_vhdl_assignment_simple is
 end entity tb_vhdl_assignment_simple;
 
@@ -148,9 +150,8 @@ begin
     check_sequence(clk, data_out, data_out_vld, checked, x"e7_03_89_ab_cd_e7_e7");
 
     -- Done.
-    assert false
-      report "Simulation Finished"
-      severity failure;
+    report "Simulation Finished";
+    finish;
   end process;
 
 
