@@ -21,12 +21,12 @@ If the user requires a waveform viewer, install:
 ## Set up python environment
 Once all requirements are installed, run:
 ```sh
-git clone https://github.com/scottshuynh/arista_interview_assignment.git
-cd arista_interview_assignment
+git clone https://github.com/scottshuynh/arista-interview-assignment.git
+cd arista-interview-assignment
 ./setup_venv.sh
 ```
 
-It is a requirement to run these steps before running any testbenches. Testbench scripts are run in the same terminal that `setup_venv.sh` was run.
+It is a requirement to run these steps before running any testbenches.
 
 `setup_venv.sh` creates a python virtual environment (venv) and installs the python packages required to seamlessly run the testbenches. If a venv was already set up, `setup_venv.sh` will do nothing.
 
