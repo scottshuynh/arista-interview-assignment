@@ -19,7 +19,7 @@ If the user requires a waveform viewer, install:
 * [gtkwave](https://github.com/gtkwave/gtkwave) 3.3.116
 
 ## Set up python environment
-Once everything is installed, run:
+Once all requirements are installed, run:
 ```sh
 git clone https://github.com/scottshuynh/arista_interview_assignment.git
 cd arista_interview_assignment
@@ -28,15 +28,20 @@ cd arista_interview_assignment
 
 It is a requirement to run these steps before running any testbenches. Testbench scripts are run in the same terminal that `setup_venv.sh` was run.
 
-`setup_venv.sh` creates a python virtual environment (venv), installs the python packages required to seamlessly run the testbenches, and activates the venv. If a venv was already set up, `setup_venv.sh` will simply activate it.
+`setup_venv.sh` creates a python virtual environment (venv) and installs the python packages required to seamlessly run the testbenches. If a venv was already set up, `setup_venv.sh` will do nothing.
 
-### Installed python packages
+### Python packages to install
 * [hdldepends](https://github.com/pevhall/hdldepends) - HDL dependency finder
 * [hdlworkflow](https://github.com/scottshuynh/hdlworkflow) - Streamlines and simplifies HDL workflows
 * [cocotb](https://github.com/cocotb/cocotb) - Enables users to write HDL testbenches in python
 
 ## Running testbenches
 Before running any testbenches, make sure to follow the steps in the section: [Set up python environment](#set-up-python-environment).
+
+Make sure the python venv is activated. From the root directory of the repo run the command:
+```sh
+source venv/bin/activate
+```
 
 All testbench scripts must be run from the root directory of the repo.
 
