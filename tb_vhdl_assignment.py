@@ -3,12 +3,18 @@ from cocotb.clock import Clock
 from cocotb.types import LogicArray, Range
 from cocotb.triggers import RisingEdge, FallingEdge
 import random
+import math
 from typing import List, Sequence
 
 from register_fsm_model import RegisterFsmModel
 
 
 async def reset_dut(dut, num_clock_cycles: int) -> None:
+    """Reset the DUT for a number of clock cycles
+
+    Args:
+        num_clock_cycles (int): Number of clock cycles to hold the DUT in reset.
+    """
     dut.reset.value = 1
     dut.data_in.value = 0
     dut.data_in_vld.value = 0
@@ -20,6 +26,12 @@ async def reset_dut(dut, num_clock_cycles: int) -> None:
 
 
 async def drive_cmds(dut, cmds: List[Sequence[int]]) -> None:
+    """Drive commands bytestreams into the DUT. Waits 8 clock cycles between commands
+    before sending the next to give the DUT time to perform reads.
+
+    Args:
+        cmds (List[Sequence[int]]): List of commands bytestreams to drive DUT.
+    """
     for cmd in cmds:
         for byte in cmd:
             dut.data_in.value = byte
@@ -36,6 +48,13 @@ async def drive_cmds(dut, cmds: List[Sequence[int]]) -> None:
 
 
 async def drive_cmds_random_vlds(dut, cmds: List[Sequence[int]]) -> None:
+    """Drive commands bytestreams into the DUT. Waits 8 clock cycles between commands
+    before sending the next to give the DUT time to perform reads. Data valid
+    is set high randomly. Data is held until data valid is set.
+
+    Args:
+        cmds (List[Sequence[int]]): List of commands bytestreams to drive DUT.
+    """
     for cmd in cmds:
         byte_idx = 0
         while byte_idx < len(cmd):
@@ -46,15 +65,27 @@ async def drive_cmds_random_vlds(dut, cmds: List[Sequence[int]]) -> None:
             else:
                 dut.data_in_vld.value = 0
             await RisingEdge(dut.clk)
+        for _ in range(8):
+            await RisingEdge(dut.clk)
 
     dut.data_in_vld.value = 0
 
 
 async def verify_sequences(dut, sequences: List[Sequence[int]]) -> None:
+    """Monitor the DUT outputs and verify read response bytestreams on every data out valid.
+
+    Args:
+        sequences (List[Sequence[int]]): List of read response bytestreams.
+    """
     timeout = 0
     for seq_idx, sequence in enumerate(sequences):
         byte_count = 0
-        # cocotb.log.info(f"Validating sequence#{seq_idx}: {sequence}")
+        if seq_idx == math.ceil(len(sequences) * 0.25):
+            cocotb.log.info("Verified 25% sequences.")
+        elif seq_idx == math.ceil(len(sequences) * 0.5):
+            cocotb.log.info("Verified 50% sequences.")
+        elif seq_idx == math.ceil(len(sequences) * 0.75):
+            cocotb.log.info("Verified 75% sequences.")
         while byte_count < len(sequence):
             timeout += 1
             await FallingEdge(dut.clk)
@@ -146,6 +177,7 @@ async def test_scoreboard_vs_model(dut):
     cocotb.log.info("Initialising model...")
     model = RegisterFsmModel(num_commands, data_w, addr_w)
 
+    cocotb.log.info(f"Driving {num_commands} commands into the DUT...")
     drive_task = cocotb.start_soon(drive_cmds(dut, model.command_bytestreams))
     verify_task = cocotb.start_soon(verify_sequences(dut, model.read_bytestreams))
 

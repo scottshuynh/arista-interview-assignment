@@ -61,3 +61,5 @@ To run the same testbench but view waveforms:
 ```sh
 ./tb_random_constrained_nvc_gtkwave.sh
 ```
+
+NOTE: Simulation can run for over 30 seconds to cover 65,536 commands.
