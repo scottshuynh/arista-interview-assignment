@@ -51,7 +51,7 @@ class RegisterFsmModel:
         If the address MSB or LSB is an ESCAPE byte, the generation of the address
         LSB must be either a READ, WRITE, BREAK, ESCAPE byte.
         """
-        num_bytes = math.ceil(self.addr_w / self.byte_w)
+        num_bytes = 4
         addr_bytes: List[int] = []
         is_escaped = False
         interrupt_cmd = False
@@ -84,7 +84,7 @@ class RegisterFsmModel:
                     addr_bytes.append(addr_byte)
                     if addr_byte == CommandBytes.ESCAPE.value:
                         is_escaped = True
-                    elif addr_byte > 0:
+                    else:
                         byte_idx += 1
                 elif is_escaped:
                     addr_byte = random.choice(self._command_values)
@@ -208,7 +208,7 @@ class RegisterFsmModel:
         """
         addr_bytes = []
         data_bytes = []
-        num_addr_bytes = math.ceil(self.addr_w / self.byte_w)
+        num_addr_bytes = 4
         num_data_bytes = math.ceil(self.data_w / self.byte_w)
         is_escaped = False
         for idx, byte in enumerate(wr_bytestream):
@@ -233,7 +233,7 @@ class RegisterFsmModel:
                     if not is_escaped:
                         if byte == CommandBytes.ESCAPE.value:
                             is_escaped = True
-                        elif byte > 0:
+                        else:
                             addr_bytes.append(byte)
                     elif is_escaped:
                         if byte == CommandBytes.BREAK.value:
@@ -283,7 +283,7 @@ class RegisterFsmModel:
         # Convert into an unsigned integer address and data then write to RAM
         addr_bits = "".join(f"{byte:08b}" for byte in bytearray(addr_bytes))
         data_bits = "".join(f"{byte:08b}" for byte in bytearray(data_bytes))
-        addr = LogicArray(addr_bits).integer
+        addr = LogicArray(addr_bits)[self.addr_w - 1 : 0].integer
         data = LogicArray(data_bits).integer
         self.mem_model.write(addr, data)
         return None
@@ -299,7 +299,7 @@ class RegisterFsmModel:
             List[int]: Read response bytestream.
         """
         addr_bytes = []
-        num_addr_bytes = math.ceil(self.addr_w / self.byte_w)
+        num_addr_bytes = 4
         num_data_bytes = math.ceil(self.data_w / self.byte_w)
         is_escaped = False
         for idx, byte in enumerate(rd_bytestream):
@@ -324,7 +324,7 @@ class RegisterFsmModel:
                     if not is_escaped:
                         if byte == CommandBytes.ESCAPE.value:
                             is_escaped = True
-                        elif byte > 0:
+                        else:
                             addr_bytes.append(byte)
                     elif is_escaped:
                         if byte == CommandBytes.BREAK.value:
@@ -339,7 +339,7 @@ class RegisterFsmModel:
 
         # Convert into an unsigned integer address and data then read from RAM
         addr_bits = "".join(f"{byte:08b}" for byte in bytearray(addr_bytes))
-        addr = LogicArray(addr_bits).integer
+        addr = LogicArray(addr_bits)[self.addr_w - 1 : 0].integer
         read_logicarray = self.mem_model.read(addr)
         read_bytes = []
         if read_logicarray:

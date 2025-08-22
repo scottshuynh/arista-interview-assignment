@@ -79,6 +79,11 @@ architecture rtl of register_fsm is
     return result;
   end function;
 
+  function resize(slv : std_logic_vector; slv_w : natural) return std_logic_vector is
+  begin
+    return std_logic_vector(resize(unsigned(slv), slv_w));
+  end function;
+
   function to_hex_string(slv : std_logic_vector) return string is
     constant HEX_CHARS  : string  := "0123456789ABCDEF";
     constant STRING_LEN : natural := (slv'length + 3) / 4;
@@ -152,7 +157,7 @@ architecture rtl of register_fsm is
 
   signal reg_fsm : reg_fsm_t := AWAIT_ESC;
 
-  constant NUM_ADDR_BYTES    : natural                                               := ADDR_W/BYTE_W;
+  constant NUM_ADDR_BYTES    : natural                                               := 4;
   constant ADDR_IDX_W        : natural                                               := ceil_log2(NUM_ADDR_BYTES);
   signal addr_bytes          : array_slv_t(0 to NUM_ADDR_BYTES-1)(BYTE_W-1 downto 0) := (others => (others => '0'));
   signal addr_bytes_idx      : unsigned(ADDR_IDX_W-1 downto 0)                       := (others => '0');
@@ -249,73 +254,68 @@ begin
         -- Receiving ESCPAE + READ/WRITE command will clear any cleared bytes.
         when PARSE_ADDR =>
           if (data_in_vld = '1') then
-            addr_bytes_rcvd <= '1';
-            if (or data_in = '1' or addr_bytes_rcvd = '0') then
-              if (byte_data_escaped = '0') then
-                if (to_cmd(data_in) = ESCAPE) then
-                  byte_data_escaped <= '1';
-                else
-                  addr_bytes(to_integer(addr_bytes_idx)) <= data_in;
-                  addr_bytes_idx                         <= addr_bytes_idx + 1;
+            if (byte_data_escaped = '0') then
+              if (to_cmd(data_in) = ESCAPE) then
+                byte_data_escaped <= '1';
+              else
+                addr_bytes(to_integer(addr_bytes_idx)) <= data_in;
+                addr_bytes_idx                         <= addr_bytes_idx + 1;
 
-                  if (addr_bytes_idx_next >= NUM_ADDR_BYTES) then
-                    addr_bytes_rcvd <= '0';
-                    addr_bytes_idx  <= (others => '0');
+                if (addr_bytes_idx_next >= NUM_ADDR_BYTES) then
+                  addr_bytes_rcvd <= '0';
+                  addr_bytes_idx  <= (others => '0');
 
-                    if (wr_task = '1') then
-                      reg_fsm <= PARSE_WRITE_DATA;
-                    else
-                      rd_en_reg <= '1';
-                      reg_fsm   <= AWAIT_ESC;
-                    end if;
+                  if (wr_task = '1') then
+                    reg_fsm <= PARSE_WRITE_DATA;
+                  else
+                    rd_en_reg <= '1';
+                    reg_fsm   <= AWAIT_ESC;
                   end if;
                 end if;
-              elsif (byte_data_escaped = '1') then
-                if (to_cmd(data_in) /= CMD_NULL) then
-                  byte_data_escaped <= '0';
-                  if (to_cmd(data_in) = CMD_BREAK) then
-                    addr_bytes_rcvd <= '0';
-                    addr_bytes_idx  <= (others => '0');
-                    reg_fsm         <= AWAIT_ESC;
-                  elsif (to_cmd(data_in) = ESCAPE) then
-                    addr_bytes(to_integer(addr_bytes_idx)) <= data_in;
-                    addr_bytes_idx                         <= addr_bytes_idx + 1;
+              end if;
+            elsif (byte_data_escaped = '1') then
+              byte_data_escaped <= '0';
+              if (to_cmd(data_in) = CMD_BREAK) then
+                addr_bytes_rcvd <= '0';
+                addr_bytes_idx  <= (others => '0');
+                reg_fsm         <= AWAIT_ESC;
+              elsif (to_cmd(data_in) = ESCAPE) then
+                addr_bytes(to_integer(addr_bytes_idx)) <= data_in;
+                addr_bytes_idx                         <= addr_bytes_idx + 1;
 
-                    if (addr_bytes_idx_next >= NUM_ADDR_BYTES) then
-                      addr_bytes_rcvd <= '0';
-                      addr_bytes_idx  <= (others => '0');
+                if (addr_bytes_idx_next >= NUM_ADDR_BYTES) then
+                  addr_bytes_rcvd <= '0';
+                  addr_bytes_idx  <= (others => '0');
 
-                      if (wr_task = '1') then
-                        reg_fsm <= PARSE_WRITE_DATA;
-                      else
-                        rd_en_reg <= '1';
-                        reg_fsm   <= AWAIT_ESC;
-                      end if;
-                    end if;
-                  elsif (to_cmd(data_in) /= ESCAPE) then
-                    -- assert (FALSE)
-                    --   report "Command change in the middle of parsing addresses!"
-                    --   severity WARNING;
-                    addr_bytes_rcvd <= '0';
-                    case (to_cmd(data_in)) is
-                      when CMD_READ             =>
-                        addr_bytes_idx <= (others => '0');
-                        wr_task        <= '0';
-                        reg_fsm        <= PARSE_ADDR;
-                      when CMD_WRITE =>
-                        addr_bytes_idx <= (others => '0');
-                        wr_task        <= '1';
-                        reg_fsm        <= PARSE_ADDR;
-                      when others =>
-                        assert (FALSE)
-                          report "Assumption violated! Escape characters in byte stream must "
-                          & "be followed by another escape character (0xe7), break chatacter (0x55)"
-                          & ", or another read/write command (0x13, 0x23). Got: 0x"
-                          & to_hex_string(data_in)
-                          severity FAILURE;
-                    end case;
+                  if (wr_task = '1') then
+                    reg_fsm <= PARSE_WRITE_DATA;
+                  else
+                    rd_en_reg <= '1';
+                    reg_fsm   <= AWAIT_ESC;
                   end if;
                 end if;
+              elsif (to_cmd(data_in) /= ESCAPE) then
+                -- assert (FALSE)
+                --   report "Command change in the middle of parsing addresses!"
+                --   severity WARNING;
+                addr_bytes_rcvd <= '0';
+                case (to_cmd(data_in)) is
+                  when CMD_READ             =>
+                    addr_bytes_idx <= (others => '0');
+                    wr_task        <= '0';
+                    reg_fsm        <= PARSE_ADDR;
+                  when CMD_WRITE =>
+                    addr_bytes_idx <= (others => '0');
+                    wr_task        <= '1';
+                    reg_fsm        <= PARSE_ADDR;
+                  when others =>
+                    assert (FALSE)
+                      report "Assumption violated! Escape characters in byte stream must "
+                      & "be followed by another escape character (0xe7), break chatacter (0x55)"
+                      & ", or another read/write command (0x13, 0x23). Got: 0x"
+                      & to_hex_string(data_in)
+                      severity FAILURE;
+                end case;
               end if;
             end if;
           end if;
@@ -350,46 +350,44 @@ begin
                   end if;
                 end if;
               elsif (byte_data_escaped = '1') then
-                if (to_cmd(data_in) /= CMD_NULL) then
-                  byte_data_escaped <= '0';
-                  if (to_cmd(data_in) = CMD_BREAK) then
+                byte_data_escaped <= '0';
+                if (to_cmd(data_in) = CMD_BREAK) then
+                  wr_data_bytes_rcvd <= '0';
+                  wr_data_bytes_idx  <= (others => '0');
+                  reg_fsm            <= AWAIT_ESC;
+                elsif (to_cmd(data_in) = ESCAPE) then
+                  wr_data_bytes(to_integer(wr_data_bytes_idx)) <= data_in;
+                  wr_data_bytes_idx                            <= wr_data_bytes_idx + 1;
+                  if (wr_data_bytes_idx_next >= DATA_W/BYTE_W) then
                     wr_data_bytes_rcvd <= '0';
+                    wr_en_reg          <= '1';
+                    wr_task            <= '0';
                     wr_data_bytes_idx  <= (others => '0');
                     reg_fsm            <= AWAIT_ESC;
-                  elsif (to_cmd(data_in) = ESCAPE) then
-                    wr_data_bytes(to_integer(wr_data_bytes_idx)) <= data_in;
-                    wr_data_bytes_idx                            <= wr_data_bytes_idx + 1;
-                    if (wr_data_bytes_idx_next >= DATA_W/BYTE_W) then
-                      wr_data_bytes_rcvd <= '0';
-                      wr_en_reg          <= '1';
-                      wr_task            <= '0';
-                      wr_data_bytes_idx  <= (others => '0');
-                      reg_fsm            <= AWAIT_ESC;
-                    end if;
-                  elsif (to_cmd(data_in) /= ESCAPE) then
-                    --assert (FALSE)
-                    --  report "Command change in the middle of a WRITE"
-                    --  severity WARNING;
-                    wr_data_bytes_rcvd <= '0';
-                    wr_data_bytes_idx  <= (others => '0');
-                    case (to_cmd(data_in)) is
-                      when CMD_READ             =>
-                        addr_bytes_idx <= (others => '0');
-                        wr_task        <= '0';
-                        reg_fsm        <= PARSE_ADDR;
-                      when CMD_WRITE =>
-                        addr_bytes_idx <= (others => '0');
-                        wr_task        <= '1';
-                        reg_fsm        <= PARSE_ADDR;
-                      when others =>
-                        assert (FALSE)
-                          report "Assumption violated! Escape characters in byte stream must "
-                          & "be followed by another escape character (0xe7), break chatacter (0x55)"
-                          & ", or another read/write command (0x13, 0x23). Got: 0x"
-                          & to_hex_string(data_in)
-                          severity FAILURE;
-                    end case;
                   end if;
+                elsif (to_cmd(data_in) /= ESCAPE) then
+                  --assert (FALSE)
+                  --  report "Command change in the middle of a WRITE"
+                  --  severity WARNING;
+                  wr_data_bytes_rcvd <= '0';
+                  wr_data_bytes_idx  <= (others => '0');
+                  case (to_cmd(data_in)) is
+                    when CMD_READ             =>
+                      addr_bytes_idx <= (others => '0');
+                      wr_task        <= '0';
+                      reg_fsm        <= PARSE_ADDR;
+                    when CMD_WRITE =>
+                      addr_bytes_idx <= (others => '0');
+                      wr_task        <= '1';
+                      reg_fsm        <= PARSE_ADDR;
+                    when others =>
+                      assert (FALSE)
+                        report "Assumption violated! Escape characters in byte stream must "
+                        & "be followed by another escape character (0xe7), break chatacter (0x55)"
+                        & ", or another read/write command (0x13, 0x23). Got: 0x"
+                        & to_hex_string(data_in)
+                        severity FAILURE;
+                  end case;
                 end if;
               end if;
             end if;
@@ -481,7 +479,7 @@ begin
   end process;
 
   -- Outputs
-  addr         <= to_flat_slv(reverse_array(addr_bytes));
+  addr         <= resize(to_flat_slv(reverse_array(addr_bytes)), ADDR_W);
   wr_data      <= to_flat_slv(reverse_array(wr_data_bytes));
   rd_en        <= rd_en_reg;
   wr_en        <= wr_en_reg;
