@@ -24,12 +24,19 @@ class RegisterFsmModel:
     Also used to generate command bytestreams."""
 
     def __init__(self, num_cmds: int, data_w: int, addr_w: int):
-        assert num_cmds > 0, f"Number of commands must be greater than 0. Got {num_cmds}."
+        assert num_cmds > 0, (
+            f"Number of commands must be greater than 0. Got {num_cmds}."
+        )
         self.data_w = data_w
         self.addr_w = addr_w
         self.byte_w = 8
         self.mem_model = MemoryModel(self.data_w, self.addr_w)
-        command_bytes = [CommandBytes.READ, CommandBytes.WRITE, CommandBytes.BREAK, CommandBytes.ESCAPE]
+        command_bytes = [
+            CommandBytes.READ,
+            CommandBytes.WRITE,
+            CommandBytes.BREAK,
+            CommandBytes.ESCAPE,
+        ]
         self._command_values = [command.value for command in command_bytes]
 
         self.command_bytestreams: List[List[int]] = []
@@ -51,8 +58,8 @@ class RegisterFsmModel:
         If the address MSB or LSB is an ESCAPE byte, the generation of the address
         LSB must be either a READ, WRITE, BREAK, ESCAPE byte.
         """
-        num_bytes = 4
-        addr_bytes: List[int] = []
+        num_bytes = math.ceil(self.addr_w / self.byte_w)
+        addr_bytes: List[int] = [0, 0]
         is_escaped = False
         interrupt_cmd = False
         byte_idx = 0
@@ -191,7 +198,9 @@ class RegisterFsmModel:
                     command_bytestreams[idx].append(command_type)
                 else:
                     command_bytestreams[idx].append(command_type)
-                    command_bytestreams[idx].extend(self.__generate_command_bytes(command_type))
+                    command_bytestreams[idx].extend(
+                        self.__generate_command_bytes(command_type)
+                    )
                     bytestream_complete = True
 
         self.command_bytestreams = command_bytestreams
@@ -223,9 +232,13 @@ class RegisterFsmModel:
                         if byte == CommandBytes.BREAK.value:
                             return None
                         elif byte == CommandBytes.WRITE.value:
-                            return self.__parse_write_bytestream(wr_bytestream[idx + 1 :])
+                            return self.__parse_write_bytestream(
+                                wr_bytestream[idx + 1 :]
+                            )
                         elif byte == CommandBytes.READ.value:
-                            return self.__parse_read_bytestream(wr_bytestream[idx + 1 :])
+                            return self.__parse_read_bytestream(
+                                wr_bytestream[idx + 1 :]
+                            )
                         elif byte == CommandBytes.ESCAPE.value:
                             addr_bytes.append(byte)
                             is_escaped = False
@@ -239,9 +252,13 @@ class RegisterFsmModel:
                         if byte == CommandBytes.BREAK.value:
                             return None
                         elif byte == CommandBytes.WRITE.value:
-                            return self.__parse_write_bytestream(wr_bytestream[idx + 1 :])
+                            return self.__parse_write_bytestream(
+                                wr_bytestream[idx + 1 :]
+                            )
                         elif byte == CommandBytes.READ.value:
-                            return self.__parse_read_bytestream(wr_bytestream[idx + 1 :])
+                            return self.__parse_read_bytestream(
+                                wr_bytestream[idx + 1 :]
+                            )
                         elif byte == CommandBytes.ESCAPE.value:
                             addr_bytes.append(byte)
                             is_escaped = False
@@ -257,9 +274,13 @@ class RegisterFsmModel:
                         if byte == CommandBytes.BREAK.value:
                             return None
                         elif byte == CommandBytes.WRITE.value:
-                            return self.__parse_write_bytestream(wr_bytestream[idx + 1 :])
+                            return self.__parse_write_bytestream(
+                                wr_bytestream[idx + 1 :]
+                            )
                         elif byte == CommandBytes.READ.value:
-                            return self.__parse_read_bytestream(wr_bytestream[idx + 1 :])
+                            return self.__parse_read_bytestream(
+                                wr_bytestream[idx + 1 :]
+                            )
                         elif byte == CommandBytes.ESCAPE.value:
                             data_bytes.append(byte)
                             is_escaped = False
@@ -273,9 +294,13 @@ class RegisterFsmModel:
                         if byte == CommandBytes.BREAK.value:
                             return None
                         elif byte == CommandBytes.WRITE.value:
-                            return self.__parse_write_bytestream(wr_bytestream[idx + 1 :])
+                            return self.__parse_write_bytestream(
+                                wr_bytestream[idx + 1 :]
+                            )
                         elif byte == CommandBytes.READ.value:
-                            return self.__parse_read_bytestream(wr_bytestream[idx + 1 :])
+                            return self.__parse_read_bytestream(
+                                wr_bytestream[idx + 1 :]
+                            )
                         elif byte == CommandBytes.ESCAPE.value:
                             data_bytes.append(byte)
                             is_escaped = False
@@ -314,9 +339,13 @@ class RegisterFsmModel:
                         if byte == CommandBytes.BREAK.value:
                             return None
                         elif byte == CommandBytes.WRITE.value:
-                            return self.__parse_write_bytestream(rd_bytestream[idx + 1 :])
+                            return self.__parse_write_bytestream(
+                                rd_bytestream[idx + 1 :]
+                            )
                         elif byte == CommandBytes.READ.value:
-                            return self.__parse_read_bytestream(rd_bytestream[idx + 1 :])
+                            return self.__parse_read_bytestream(
+                                rd_bytestream[idx + 1 :]
+                            )
                         elif byte == CommandBytes.ESCAPE.value:
                             addr_bytes.append(byte)
                             is_escaped = False
@@ -330,9 +359,13 @@ class RegisterFsmModel:
                         if byte == CommandBytes.BREAK.value:
                             return None
                         elif byte == CommandBytes.WRITE.value:
-                            return self.__parse_write_bytestream(rd_bytestream[idx + 1 :])
+                            return self.__parse_write_bytestream(
+                                rd_bytestream[idx + 1 :]
+                            )
                         elif byte == CommandBytes.READ.value:
-                            return self.__parse_read_bytestream(rd_bytestream[idx + 1 :])
+                            return self.__parse_read_bytestream(
+                                rd_bytestream[idx + 1 :]
+                            )
                         elif byte == CommandBytes.ESCAPE.value:
                             addr_bytes.append(byte)
                             is_escaped = False
@@ -344,7 +377,11 @@ class RegisterFsmModel:
         read_bytes = []
         if read_logicarray:
             for idx in range(num_data_bytes):
-                read_bytes.append(read_logicarray[(idx + 1) * self.byte_w - 1 : idx * self.byte_w].integer)
+                read_bytes.append(
+                    read_logicarray[
+                        (idx + 1) * self.byte_w - 1 : idx * self.byte_w
+                    ].integer
+                )
             read_bytes.reverse()
         else:
             read_bytes.append(CommandBytes.BREAK.value)
